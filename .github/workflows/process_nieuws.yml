@@ -48,7 +48,7 @@ jobs:
 
           # Jouw vaste crop-tijden
           CUT_START=5
-          CUT_END=$(awk "BEGIN {print $DURATION - 5}")  # 5 sec start + 1 sec fade-out
+          CUT_END=$(awk "BEGIN {print $DURATION - 11}")  # 5 sec start + 1 sec fade-out
 
           if (( $(echo "$CUT_END < 2" | bc -l) )); then
             echo "Audio te kort"
@@ -56,7 +56,7 @@ jobs:
           fi
 
           ffmpeg -y -ss $CUT_START -i raw_nieuws.mp3 -t $CUT_END \
-            -af "afade=t=in:ss=0:d=1,afade=t=out:st=$(awk "BEGIN {print $CUT_END - 2}"):d=1" \
+            -af "afade=t=in:ss=0:d=1,afade=t=out:st=$(awk "BEGIN {print $CUT_END - 1}"):d=1" \
             Focus_Fantastique_Nieuws_en_Weer.mp3
 
           rm raw_nieuws.mp3
