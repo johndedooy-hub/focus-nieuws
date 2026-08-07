@@ -11,6 +11,7 @@ permissions:
 jobs:
   build-and-commit:
     runs-on: ubuntu-latest
+    retention-days: 1
 
     steps:
       - name: Checkout repository
