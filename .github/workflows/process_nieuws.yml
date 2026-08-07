@@ -56,7 +56,7 @@ jobs:
           fi
 
           ffmpeg -y -ss $CUT_START -i raw_nieuws.mp3 -t $CUT_END \
-            -af "afade=t=in:ss=0:d=1,afade=t=out:st=$(awk "BEGIN {print $CUT_END - 1}"):d=1" \
+            -af "afade=t=in:ss=0:d=1,afade=t=out:st=$(awk "BEGIN {print $CUT_END - 2}"):d=1" \
             Focus_Fantastique_Nieuws_en_Weer.mp3
 
           rm raw_nieuws.mp3
