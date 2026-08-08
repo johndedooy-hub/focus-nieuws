@@ -2,7 +2,7 @@ name: Process and Host Nieuws MP3
 
 on:
   schedule:
-    - cron: '*/3 * * * *'   # elke uur om :05
+    - cron: '*/15 * * * *'   # elk kwartier om :15
   workflow_dispatch:
 
 permissions:
