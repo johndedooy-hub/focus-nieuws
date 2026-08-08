@@ -48,7 +48,7 @@ jobs:
 
           # Jouw vaste crop-tijden
           CUT_START=5
-          CUT_END=$(awk "BEGIN {print $DURATION - 10}")  # 5 sec start + 1 sec fade-out
+          CUT_END=$(awk "BEGIN {print $DURATION - 10.5}")  # 5 sec start + 1 sec fade-out
 
           if (( $(echo "$CUT_END < 2" | bc -l) )); then
             echo "Audio te kort"
