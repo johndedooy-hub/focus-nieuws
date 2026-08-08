@@ -36,16 +36,7 @@ jobs:
             echo "Download mislukt"
             exit 1
           fi
-          
-      - name: Set MP3 metadata
-        run: |
-          ffmpeg -y -i Focus_Fantastique_Nieuws_en_Weer.mp3 \
-            -metadata artist="Focus Fantastique ANP nieuws" \
-            -metadata album="Focus Fantastique ANP update" \
-            -codec copy Focus_Fantastique_Nieuws_en_Weer_tagged.mp3
-
-          mv Focus_Fantastique_Nieuws_en_Weer_tagged.mp3 Focus_Fantastique_Nieuws_en_Weer.mp3
-          
+              
       - name: Process audio (crop + fade)
       
         run: |
@@ -70,7 +61,16 @@ jobs:
             Focus_Fantastique_Nieuws_en_Weer.mp3
 
           rm raw_nieuws.mp3
+          
+      - name: Set MP3 metadata
+        run: |
+          ffmpeg -y -i Focus_Fantastique_Nieuws_en_Weer.mp3 \
+            -metadata artist="Focus Fantastique ANP nieuws" \
+            -metadata album="Focus Fantastique ANP update" \
+            -codec copy Focus_Fantastique_Nieuws_en_Weer_tagged.mp3
 
+          mv Focus_Fantastique_Nieuws_en_Weer_tagged.mp3 Focus_Fantastique_Nieuws_en_Weer.mp3
+          
       - name: Commit and Push update
         run: |
           if [ -f Focus_Fantastique_Nieuws_en_Weer.mp3 ]; then
