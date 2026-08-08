@@ -71,6 +71,18 @@ jobs:
 
           mv Focus_Fantastique_Nieuws_en_Weer_tagged.mp3 Focus_Fantastique_Nieuws_en_Weer.mp3
           
+      - name: Embed cover image
+        run: |
+          ffmpeg -y -i Focus_Fantastique_Nieuws_en_Weer.mp3 \
+            -i FocusFantastiqueNieuws.jpg \
+            -map 0:a -map 1:v \
+            -c:a copy -c:v mjpeg \
+            -metadata:s:v title="Album cover" \
+            -metadata:s:v comment="Cover image" \
+            Focus_Fantastique_Nieuws_en_Weer_cover.mp3
+
+          mv Focus_Fantastique_Nieuws_en_Weer_cover.mp3 Focus_Fantastique_Nieuws_en_Weer.mp3
+          
       - name: Commit and Push update
         run: |
           if [ -f Focus_Fantastique_Nieuws_en_Weer.mp3 ]; then
