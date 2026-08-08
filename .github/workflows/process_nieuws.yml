@@ -38,7 +38,7 @@ jobs:
           fi
 
       - name: Process audio (crop + fade)
-            - name: Set MP3 metadata
+             name: Set MP3 metadata
         run: |
           ffmpeg -y -i Focus_Fantastique_Nieuws_en_Weer.mp3 \
             -metadata artist="Focus Fantastique ANP nieuws" \
