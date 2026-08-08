@@ -36,9 +36,8 @@ jobs:
             echo "Download mislukt"
             exit 1
           fi
-
-      - name: Process audio (crop + fade)
-            - name: Set MP3 metadata
+          
+      - name: Set MP3 metadata
         run: |
           ffmpeg -y -i Focus_Fantastique_Nieuws_en_Weer.mp3 \
             -metadata artist="Focus Fantastique ANP nieuws" \
@@ -47,6 +46,8 @@ jobs:
 
           mv Focus_Fantastique_Nieuws_en_Weer_tagged.mp3 Focus_Fantastique_Nieuws_en_Weer.mp3
           
+      - name: Process audio (crop + fade)
+      
         run: |
           DURATION=$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 raw_nieuws.mp3)
 
