@@ -162,7 +162,7 @@ jobs:
           if git diff --quiet Focus_Fantastique_tts.mp3; then
             echo "No changes to audio file"
           else
-            git add Focus_Fantastique_tts.mp3
+            git add Focus_Fantastique_.mp3
             git commit -m "Update: FocusFantastique Nieuws Update - $(date '+%H:%M')"
             git push
           fi
