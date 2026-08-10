@@ -1,4 +1,4 @@
-name: RSS to TTS Audio Processing
+name: RSS To FF Nieuws Update
 
 on:
   workflow_dispatch:
