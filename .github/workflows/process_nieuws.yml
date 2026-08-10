@@ -163,6 +163,6 @@ jobs:
             echo "No changes to audio file"
           else
             git add Focus_Fantastique_Nieuws_en_Weer.mp3
-            git commit -m "Update: FocusFantastique Nieuws Update - $(date '+%H:%M')"
+            git commit -m "Update: FocusFantastique Nieuws Update - $(date "+ 2 hour" '+%H:%M')"
             git push
           fi
