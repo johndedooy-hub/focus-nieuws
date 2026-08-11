@@ -38,6 +38,7 @@ jobs:
           OUTPUT_FILE: 'Focus_Fantastique_Nieuws_en_Weer.mp3'
           COVER_IMAGE: 'FocusFantastiqueNieuws.jpg'
           TZ: 'Europe/Amsterdam'  # Add this line
+          
         run: |
           python3 << 'EOF'
           import feedparser
@@ -164,6 +165,7 @@ jobs:
             echo "No changes to audio file"
           else
             git add Focus_Fantastique_Nieuws_en_Weer.mp3
+            git add TZ: 'Europe/Amsterdam'
             git commit -m "Update: FocusFantastique Nieuws Update - $(date '+%H:%M')"
             git push
           fi
