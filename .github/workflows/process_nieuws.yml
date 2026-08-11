@@ -115,7 +115,7 @@ jobs:
           # Add ID3 tags
           print("Adding ID3 tags...")
           timestamp = datetime.now().strftime('%H:%M')
-          title = f"FocusFantastique Nieuws Update [{timestamp}]"
+          title = f"FocusFantastique Nieuws Update [{timestamp}]UTC"
           
           try:
               audio_file = MP3(output_file)
@@ -164,6 +164,6 @@ jobs:
             echo "No changes to audio file"
           else
             git add Focus_Fantastique_Nieuws_en_Weer.mp3
-            git commit -m "Update: FocusFantastique Nieuws Update - $(date '+%H:%M')" +2H
+            git commit -m "Update: FocusFantastique Nieuws Update - $(date '+%H:%M')UTC"
             git push
           fi
