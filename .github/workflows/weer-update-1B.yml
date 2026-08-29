@@ -202,7 +202,7 @@ jobs:
                   bed = bed[:len(voice)]
                   final = bed.overlay(voice)
               except Exception as e:
-                  print("Waarschuwing: newsbed overlay faalde:", e)
+                  print("Waarschuwing: weer-update-bed overlay faalde:", e)
                   final = voice
 
           # --- EXPORT MP3 ---
