@@ -245,16 +245,20 @@ jobs:
       - name: Commit and push changes
         run: |
           set -e
+
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
 
-          git add weer-update.mp3 weer-update.txt || true
-          git pull origin main --rebase || true
+          git add weer-update.mp3 weer-update.txt
 
           if git diff --cached --quiet; then
             echo "Geen wijzigingen om te committen."
-          else
-            git commit -m "FAST Update: Weer Update - UTC+2 $(date '+%H:%M')"
-            git push
+            exit 0
           fi
-          
+
+          git commit -m "FAST Update: Weer Update - UTC+2 $(date '+%H:%M')"
+
+          git fetch origin main
+          git rebase origin/main
+
+          git push origin HEAD:main
