@@ -76,24 +76,28 @@ jobs:
           if not txt_data:
               exit_with("TXT bestand is leeg — workflow stopt netjes.", 0)
 
-          # --- TXT DIRECT GEBRUIKEN (geen intro/outro) ---
-          transcript = txt_data
+          # --- WELKOM + TXT + EINDE ---
+          transcript = (
+              "Hallo, dit is de Focus Fantastiek Weer Update.\n"
+              + txt_data
+              + "\nEn dat was het weer, tot straks!"
+          )
 
           # --- TXT OPSLAAN ---
           try:
               with open("weer-update.txt", "w", encoding="utf-8") as f:
-              f.write("Hallo, dit is de Focus Fantastiek Weer Update.\n"
-                  + text +
-                  "En dat was het weer, tot straks!")
+                  f.write(transcript)
           except Exception as e:
               exit_with(f"Fout bij opslaan weer-update.txt: {e}", 1)
 
           # --- CPML TOS automatisch accepteren (non-interactive CI) ---
           try:
               from TTS.utils.manage import ModelManager
+
               def _skip_tos(self, output_path):
                   print("CPML TOS automatisch geaccepteerd (CI).")
                   return True
+
               ModelManager.ask_tos = _skip_tos
           except Exception as e:
               print("Waarschuwing: kon CPML TOS override niet instellen:", e)
@@ -101,6 +105,7 @@ jobs:
           # --- MODEL VOORAF DOWNLOADEN (vermijdt runtime prompts en partial loads) ---
           model_name = "tts_models/multilingual/multi-dataset/xtts_v2"
           model_path = None
+
           try:
               manager = ModelManager()
               print("Start model download via ModelManager:", model_name)
@@ -115,8 +120,14 @@ jobs:
               from TTS.tts.configs.xtts_config import XttsConfig
               from TTS.tts.models.xtts import XttsAudioConfig, XttsArgs
               from TTS.config.shared_configs import BaseDatasetConfig
+
               # Allowlist de benodigde classes voor torch.load
-              torch.serialization.add_safe_globals([XttsConfig, XttsAudioConfig, XttsArgs, BaseDatasetConfig])
+              torch.serialization.add_safe_globals([
+                  XttsConfig,
+                  XttsAudioConfig,
+                  XttsArgs,
+                  BaseDatasetConfig
+              ])
               print("Torch safe globals toegevoegd.")
           except Exception as e:
               print("Waarschuwing: kon torch safe globals niet instellen:", e)
@@ -135,6 +146,7 @@ jobs:
 
           # --- PREPARE SPEAKER WAV (fallback als niet aanwezig) ---
           speaker_src = "stem_voorbeeld.mp3"
+
           if not os.path.exists(speaker_src):
               print("stem_voorbeeld.mp3 niet gevonden; maak fallback clean_speaker.wav (stil).")
               silent = AudioSegment.silent(duration=1000)
@@ -178,12 +190,15 @@ jobs:
 
           # --- NEWSBED OVERLAY (optioneel) ---
           final = voice
-          if os.path.exists("newsbed-1.mp3"):
+
+          if os.path.exists("weer-update-bed.mp3"):
               try:
                   bed = AudioSegment.from_file("weer-update-bed.mp3") - 20
+
                   if len(bed) < len(voice) and len(bed) > 0:
                       repeat = math.ceil(len(voice) / len(bed))
                       bed = bed * repeat
+
                   bed = bed[:len(voice)]
                   final = bed.overlay(voice)
               except Exception as e:
@@ -207,9 +222,18 @@ jobs:
               id3.add(TALB(encoding=3, text="Weer Update"))
 
               cover = os.environ.get("COVER_IMAGE", "weer-update.jpg")
+
               if os.path.exists(cover):
                   with open(cover, "rb") as img:
-                      id3.add(APIC(encoding=3, mime="image/jpeg", type=3, desc="Cover", data=img.read()))
+                      id3.add(
+                          APIC(
+                              encoding=3,
+                              mime="image/jpeg",
+                              type=3,
+                              desc="Cover",
+                              data=img.read()
+                          )
+                      )
 
               id3.save("weer-update.mp3")
           except Exception as e:
