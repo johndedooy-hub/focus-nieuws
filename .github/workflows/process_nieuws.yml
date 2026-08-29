@@ -158,10 +158,20 @@ jobs:
 
       - name: Commit and push changes
         run: |
-          if git diff --quiet Focus_Fantastique_Nieuws_en_Weer.mp3; then
+          set -e
+
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+
+          if git diff --quiet -- Focus_Fantastique_Nieuws_en_Weer.mp3; then
             echo "No changes to audio file"
-          else
-            git add Focus_Fantastique_Nieuws_en_Weer.mp3
-            git commit -m "Update: FocusFantastique Nieuws Update - $(date '+%H:%M')UTC"
-            git push
+            exit 0
           fi
+
+          git add Focus_Fantastique_Nieuws_en_Weer.mp3
+          git commit -m "Update: FocusFantastique Nieuws Update - $(date '+%H:%M')UTC"
+
+          git fetch origin main
+          git rebase origin/main
+
+          git push origin HEAD:main
