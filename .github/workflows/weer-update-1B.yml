@@ -80,7 +80,7 @@ jobs:
           transcript = (
               "Hallo, dit is de Focus Fantastiek Weer Update.\n"
               + txt_data
-              + "\nEn dat was het weer, tot straks!"
+              + "\n Ik ben Karin Molenbroek en dat was het weer! Tot straks!"
           )
 
           # --- TXT OPSLAAN ---
