@@ -40,7 +40,7 @@ jobs:
 
       - name: Run FAST pipeline
         env:
-          DRIVE_TXT_URL: 'https://focusfantastique.nl/weer-update.txt'
+          DRIVE_TXT_URL: 'https://focusfantastique.nl/weer-update.php'
           COVER_IMAGE: 'weer-update.jpg'
           XTTS_SPEED: '1.50'
           XDG_CACHE_HOME: '/home/runner/.cache'
