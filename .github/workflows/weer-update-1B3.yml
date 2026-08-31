@@ -1,4 +1,4 @@
-name: Create Omroep Brabant Forecast Fantastique MP3
+name: Create Omroep Brabant Forecast Fantastique MP3 1B.5
 
 on:
   workflow_dispatch:
