@@ -1,0 +1,877 @@
+name: Create Omroep Brabant Forecast Fantastique MP3 1B.2
+
+on:
+  workflow_dispatch:
+
+jobs:
+  process-audio:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+
+      # ================================================================
+      # CHECKOUT
+      # ================================================================
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+
+      # ================================================================
+      # CACHE TTS MODELS
+      # ================================================================
+
+      - name: Cache TTS models
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/tts
+            ~/.cache/faster_whisper
+            ~/.cache/torch
+            ~/.cache/huggingface
+          key: tts-whisper-cache
+
+
+      # ================================================================
+      # PYTHON
+      # ================================================================
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+
+      # ================================================================
+      # DEPENDENCIES + FFMPEG
+      # ================================================================
+
+      - name: Install dependencies & FFmpeg
+        run: |
+          set -e
+
+          python -m pip install --upgrade pip
+
+          python -m pip install \
+            --default-timeout=60 \
+            torchcodec
+
+          python -m pip install \
+            --default-timeout=60 \
+            "transformers<4.40.0" \
+            "scipy<1.13.0" \
+            pydub \
+            mutagen \
+            requests \
+            python-dateutil \
+            TTS
+
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
+
+      # ================================================================
+      # RUN FORECAST FANTASTIQUE PIPELINE
+      # ================================================================
+
+      - name: Run Forecast Fantastique pipeline
+        env:
+
+          # ------------------------------------------------------------
+          # BRONBESTAND
+          # ------------------------------------------------------------
+
+          DRIVE_TXT_URL: 'https://focusfantastique.nl/weer-update.txt'
+
+          # ------------------------------------------------------------
+          # BESTANDEN
+          # ------------------------------------------------------------
+
+          COVER_IMAGE: 'weer-update.jpg'
+
+          # ------------------------------------------------------------
+          # XTTS
+          # ------------------------------------------------------------
+
+          XTTS_SPEED: '1.50'
+
+          # ------------------------------------------------------------
+          # CACHE
+          # ------------------------------------------------------------
+
+          XDG_CACHE_HOME: '/home/runner/.cache'
+          TORCH_HOME: '/home/runner/.cache/torch'
+          TRANSFORMERS_CACHE: '/home/runner/.cache/huggingface'
+
+        run: |
+
+          set -e
+
+          python3 - <<'EOF'
+
+          import os
+          import sys
+          import math
+          import requests
+
+          from pydub import AudioSegment, effects
+          from mutagen.id3 import (
+              ID3,
+              TIT2,
+              TALB,
+              APIC,
+              ID3NoHeaderError
+          )
+
+
+          # ============================================================
+          # HULPFUNCTIE VOOR FOUTEN
+          # ============================================================
+
+          def exit_with(message, code=1):
+
+              print(message)
+              sys.exit(code)
+
+
+          # ============================================================
+          # TXT DOWNLOADEN
+          # ============================================================
+
+          url = os.environ.get("DRIVE_TXT_URL")
+
+          if not url:
+              exit_with(
+                  "DRIVE_TXT_URL is niet ingesteld.",
+                  1
+              )
+
+
+          print("Download weer-update.txt...")
+          print("Bron:", url)
+
+
+          try:
+
+              response = requests.get(
+                  url,
+                  timeout=60
+              )
+
+              response.raise_for_status()
+
+              txt_data = response.text
+
+          except Exception as e:
+
+              exit_with(
+                  f"Fout bij downloaden TXT: {e}",
+                  1
+              )
+
+
+          # ============================================================
+          # CONTROLEREN OF TXT NIET LEEG IS
+          # ============================================================
+
+          txt_data = txt_data.strip()
+
+
+          if not txt_data:
+
+              print(
+                  "TXT bestand is leeg — workflow stopt netjes."
+              )
+
+              raise SystemExit(0)
+
+
+          print("TXT succesvol ontvangen.")
+
+
+          # ============================================================
+          # TEKST OPBOUWEN
+          # ============================================================
+
+          transcript = (
+
+              "Hallo, dit is de Focus Fantastiek Weer Update.\n"
+
+              + txt_data
+
+              + "\nEn tot zover de update."
+
+          )
+
+
+          # ============================================================
+          # TXT OPSLAAN
+          # ============================================================
+
+          try:
+
+              with open(
+                  "weer-update.txt",
+                  "w",
+                  encoding="utf-8"
+              ) as file:
+
+                  file.write(transcript)
+
+          except Exception as e:
+
+              exit_with(
+                  f"Fout bij opslaan weer-update.txt: {e}",
+                  1
+              )
+
+
+          print("weer-update.txt opgeslagen.")
+
+
+          # ============================================================
+          # CPML TOS
+          #
+          # XTTS gebruikt een model met CPML-licentie.
+          # In GitHub Actions mag hiervoor geen interactieve
+          # vraag verschijnen.
+          # ============================================================
+
+          try:
+
+              from TTS.utils.manage import ModelManager
+
+
+              def _skip_tos(
+                  self,
+                  output_path
+              ):
+
+                  print(
+                      "CPML TOS automatisch geaccepteerd (CI)."
+                  )
+
+                  return True
+
+
+              ModelManager.ask_tos = _skip_tos
+
+          except Exception as e:
+
+              print(
+                  "Waarschuwing: CPML TOS override kon "
+                  f"niet worden ingesteld: {e}"
+              )
+
+
+          # ============================================================
+          # XTTS MODEL
+          #
+          # Model eerst volledig downloaden.
+          # Hierdoor vermijden we runtime prompts en gedeeltelijke
+          # model-downloads.
+          # ============================================================
+
+          model_name = (
+              "tts_models/multilingual/"
+              "multi-dataset/xtts_v2"
+          )
+
+
+          model_path = None
+
+
+          try:
+
+              manager = ModelManager()
+
+              print(
+                  "Start XTTS model download:"
+              )
+
+              print(model_name)
+
+
+              model_path, config_path, model_item = (
+                  manager.download_model(model_name)
+              )
+
+
+              print(
+                  "XTTS model gedownload naar:"
+              )
+
+              print(model_path)
+
+
+          except Exception as e:
+
+              exit_with(
+                  "Fout bij downloaden XTTS model: "
+                  f"{e}",
+                  1
+              )
+
+
+          # ============================================================
+          # PYTORCH SAFE GLOBALS
+          #
+          # Nodig bij nieuwere PyTorch-versies wanneer het XTTS-model
+          # met weights_only geladen wordt.
+          # ============================================================
+
+          try:
+
+              import torch
+
+              from TTS.tts.configs.xtts_config import (
+                  XttsConfig
+              )
+
+              from TTS.tts.models.xtts import (
+                  XttsAudioConfig,
+                  XttsArgs
+              )
+
+              from TTS.config.shared_configs import (
+                  BaseDatasetConfig
+              )
+
+
+              torch.serialization.add_safe_globals([
+
+                  XttsConfig,
+                  XttsAudioConfig,
+                  XttsArgs,
+                  BaseDatasetConfig
+
+              ])
+
+
+              print(
+                  "Torch safe globals toegevoegd."
+              )
+
+
+          except Exception as e:
+
+              print(
+                  "Waarschuwing: torch safe globals "
+                  f"kon niet worden ingesteld: {e}"
+              )
+
+
+          # ============================================================
+          # XTTS INITIALISEREN
+          # ============================================================
+
+          try:
+
+              from TTS.api import TTS
+
+          except Exception as e:
+
+              exit_with(
+                  f"Fout bij import TTS.api: {e}",
+                  1
+              )
+
+
+          try:
+
+              tts_source = (
+                  model_path
+                  if model_path
+                  else model_name
+              )
+
+
+              print(
+                  "XTTS initialiseren..."
+              )
+
+
+              tts = TTS(
+                  tts_source
+              )
+
+
+              print(
+                  "XTTS succesvol geladen."
+              )
+
+
+          except Exception as e:
+
+              exit_with(
+                  "Fout bij laden XTTS model: "
+                  f"{e}",
+                  1
+              )
+
+
+          # ============================================================
+          # SPEAKER WAV MAKEN
+          # ============================================================
+
+          speaker_src = "stem_voorbeeld.mp3"
+
+
+          if not os.path.exists(speaker_src):
+
+              print(
+                  "stem_voorbeeld.mp3 niet gevonden."
+              )
+
+              print(
+                  "Er wordt een stille fallback gebruikt."
+              )
+
+
+              silent = AudioSegment.silent(
+                  duration=1000
+              )
+
+
+              silent.export(
+                  "clean_speaker.wav",
+                  format="wav"
+              )
+
+
+          else:
+
+              try:
+
+                  print(
+                      "Stemvoorbeeld verwerken..."
+                  )
+
+
+                  speaker = AudioSegment.from_file(
+                      speaker_src
+                  )
+
+
+                  speaker = effects.normalize(
+                      speaker
+                  )
+
+
+                  speaker = speaker.low_pass_filter(
+                      9000
+                  )
+
+
+                  speaker = speaker.high_pass_filter(
+                      100
+                  )
+
+
+                  speaker.export(
+                      "clean_speaker.wav",
+                      format="wav"
+                  )
+
+
+                  print(
+                      "clean_speaker.wav aangemaakt."
+                  )
+
+
+              except Exception as e:
+
+                  exit_with(
+                      "Fout bij verwerken "
+                      f"{speaker_src}: {e}",
+                      1
+                  )
+
+
+          # ============================================================
+          # SPRAAKTEMPO
+          # ============================================================
+
+          try:
+
+              speed = float(
+                  os.environ.get(
+                      "XTTS_SPEED",
+                      "1.50"
+                  )
+              )
+
+          except Exception:
+
+              speed = 1.50
+
+
+          print(
+              "XTTS snelheid:",
+              speed
+          )
+
+
+          # ============================================================
+          # TTS GENEREREN
+          # ============================================================
+
+          try:
+
+              tts.tts_to_file(
+
+                  text=transcript,
+
+                  speaker_wav="clean_speaker.wav",
+
+                  language="nl",
+
+                  file_path="raw.wav",
+
+                  speed=speed
+
+              )
+
+          except Exception as e:
+
+              exit_with(
+                  "Fout tijdens TTS generatie: "
+                  f"{e}",
+                  1
+              )
+
+
+          # ============================================================
+          # CONTROLEREN OF RAW.WAV BESTAAT
+          # ============================================================
+
+          if not os.path.exists("raw.wav"):
+
+              exit_with(
+                  "raw.wav niet aangemaakt door TTS.",
+                  1
+              )
+
+
+          print(
+              "raw.wav succesvol aangemaakt."
+          )
+
+
+          # ============================================================
+          # STEM NORMALISEREN
+          # ============================================================
+
+          try:
+
+              voice = AudioSegment.from_file(
+                  "raw.wav"
+              )
+
+
+              voice = effects.normalize(
+                  voice
+              )
+
+
+          except Exception as e:
+
+              exit_with(
+                  "Fout bij laden raw.wav: "
+                  f"{e}",
+                  1
+              )
+
+
+          # ============================================================
+          # NEWSBED
+          # ============================================================
+
+          final = voice
+
+
+          bed_file = "weer-update-bed.mp3"
+
+
+          if os.path.exists(bed_file):
+
+              print(
+                  "Newsbed gevonden:",
+                  bed_file
+              )
+
+
+              try:
+
+                  bed = AudioSegment.from_file(
+                      bed_file
+                  )
+
+
+                  # Achtergrondmuziek zachter
+                  bed = bed - 20
+
+
+                  # Muziek herhalen indien nodig
+                  if (
+                      len(bed) < len(voice)
+                      and len(bed) > 0
+                  ):
+
+                      repeat = math.ceil(
+                          len(voice) / len(bed)
+                      )
+
+
+                      bed = bed * repeat
+
+
+                  # Exact dezelfde lengte als de stem
+                  bed = bed[:len(voice)]
+
+
+                  # Stem over de muziek leggen
+                  final = bed.overlay(
+                      voice
+                  )
+
+
+                  print(
+                      "Newsbed succesvol toegevoegd."
+                  )
+
+
+              except Exception as e:
+
+                  print(
+                      "Waarschuwing: newsbed overlay "
+                      f"faalde: {e}"
+                  )
+
+
+                  print(
+                      "De stem wordt zonder newsbed gebruikt."
+                  )
+
+
+                  final = voice
+
+
+          else:
+
+              print(
+                  "Geen newsbed gevonden — "
+                  "alleen stem wordt gebruikt."
+              )
+
+
+          # ============================================================
+          # MP3 EXPORT
+          # ============================================================
+
+          try:
+
+              final.export(
+
+                  "weer-update.mp3",
+
+                  format="mp3",
+
+                  bitrate="128k"
+
+              )
+
+          except Exception as e:
+
+              exit_with(
+                  "Fout bij export weer-update.mp3: "
+                  f"{e}",
+                  1
+              )
+
+
+          print(
+              "weer-update.mp3 succesvol aangemaakt."
+          )
+
+
+          # ============================================================
+          # ID3 TAGS
+          # ============================================================
+
+          try:
+
+              try:
+
+                  id3 = ID3(
+                      "weer-update.mp3"
+                  )
+
+              except ID3NoHeaderError:
+
+                  id3 = ID3()
+
+
+              id3.add(
+                  TIT2(
+                      encoding=3,
+                      text="Weer Update"
+                  )
+              )
+
+
+              id3.add(
+                  TALB(
+                      encoding=3,
+                      text="Weer Update"
+                  )
+              )
+
+
+              # --------------------------------------------------------
+              # COVER
+              # --------------------------------------------------------
+
+              cover = os.environ.get(
+                  "COVER_IMAGE",
+                  "weer-update.jpg"
+              )
+
+
+              if os.path.exists(cover):
+
+                  with open(
+                      cover,
+                      "rb"
+                  ) as img:
+
+                      id3.add(
+
+                          APIC(
+
+                              encoding=3,
+
+                              mime="image/jpeg",
+
+                              type=3,
+
+                              desc="Cover",
+
+                              data=img.read()
+
+                          )
+
+                      )
+
+
+                  print(
+                      "Cover image toegevoegd."
+                  )
+
+
+              else:
+
+                  print(
+                      "Cover image niet gevonden:",
+                      cover
+                  )
+
+
+              id3.save(
+                  "weer-update.mp3"
+              )
+
+
+          except Exception as e:
+
+              print(
+                  "Waarschuwing: ID3 taggen faalde:",
+                  e
+              )
+
+
+          # ============================================================
+          # KLAAR
+          # ============================================================
+
+          print("")
+          print(
+              "================================================"
+          )
+          print(
+              "Forecast Fantastique pipeline voltooid."
+          )
+          print(
+              "Bestanden:"
+          )
+          print(
+              "- weer-update.txt"
+          )
+          print(
+              "- weer-update.mp3"
+          )
+          print(
+              "XTTS snelheid:",
+              speed
+          )
+          print(
+              "================================================"
+          )
+
+
+          EOF
+
+
+      # ================================================================
+      # COMMIT EN PUSH
+      # ================================================================
+
+      - name: Commit and push changes
+        run: |
+
+          set -e
+
+
+          git config --local user.email "action@github.com"
+
+          git config --local user.name "GitHub Action"
+
+
+          # ------------------------------------------------------------
+          # Bestanden klaarzetten
+          # ------------------------------------------------------------
+
+          git add \
+            weer-update.mp3 \
+            weer-update.txt
+
+
+          # ------------------------------------------------------------
+          # Geen wijzigingen?
+          # ------------------------------------------------------------
+
+          if git diff --cached --quiet; then
+
+            echo "Geen wijzigingen om te committen."
+
+            exit 0
+
+          fi
+
+
+          # ------------------------------------------------------------
+          # Commit
+          # ------------------------------------------------------------
+
+          git commit \
+            -m "FAST Update: Weer Update - UTC+2 $(date '+%H:%M')"
+
+
+          # ------------------------------------------------------------
+          # Laatste versie van main ophalen
+      
