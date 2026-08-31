@@ -63,19 +63,19 @@ jobs:
           # Spraaksnelheid
           # 1.00 = normaal
           # 1.50 = sneller
-          XTTS_SPEED: '1.50'
+          XTTS_SPEED: '1.55'
 
           # Pitch
           # 1.00 = origineel
           # 0.98 = heel subtiel lager
           # 0.95 = iets lager
           # 0.90 = duidelijk lager
-          PITCH_FACTOR: '0.95'
+          PITCH_FACTOR: '0.90'
 
           # Expressiviteit
           XTTS_TEMPERATURE: '0.75'
-          XTTS_TOP_P: '0.85'
-          XTTS_TOP_K: '50'
+          XTTS_TOP_P: '0.90'
+          XTTS_TOP_K: '60'
 
           XDG_CACHE_HOME: '/home/runner/.cache'
           TORCH_HOME: '/home/runner/.cache/torch'
