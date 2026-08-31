@@ -1,4 +1,4 @@
-name: Create Omroep Brabant Forecast Fantastique MP3 1B.4
+name: Create Omroep Brabant Forecast Fantastique MP3
 
 on:
   workflow_dispatch:
@@ -12,19 +12,10 @@ jobs:
 
     steps:
 
-      # ================================================================
-      # CHECKOUT
-      # ================================================================
-
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-
-      # ================================================================
-      # CACHE
-      # ================================================================
 
       - name: Cache TTS models
         uses: actions/cache@v3
@@ -36,20 +27,10 @@ jobs:
             ~/.cache/huggingface
           key: tts-whisper-cache
 
-
-      # ================================================================
-      # PYTHON
-      # ================================================================
-
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-
-
-      # ================================================================
-      # DEPENDENCIES
-      # ================================================================
 
       - name: Install dependencies & FFmpeg
         run: |
@@ -74,43 +55,24 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y ffmpeg
 
-
-      # ================================================================
-      # FORECAST FANTASTIQUE
-      # ================================================================
-
       - name: Run Forecast Fantastique pipeline
         env:
-
           DRIVE_TXT_URL: 'https://focusfantastique.nl/weer-update.txt'
-
           COVER_IMAGE: 'weer-update.jpg'
 
-          # ------------------------------------------------------------
-          # SPRAAKTEMPO
-          # ------------------------------------------------------------
-
+          # Spraaksnelheid
+          # 1.00 = normaal
+          # 1.50 = sneller
           XTTS_SPEED: '1.50'
 
-          # ------------------------------------------------------------
-          # PITCH
-          #
+          # Pitch
           # 1.00 = origineel
           # 0.98 = heel subtiel lager
           # 0.95 = iets lager
           # 0.90 = duidelijk lager
-          # ------------------------------------------------------------
-
           PITCH_FACTOR: '0.95'
 
-          # ------------------------------------------------------------
-          # XTTS EXPRESSIVITEIT
-          #
-          # Deze waarden worden geprobeerd.
-          # Als jouw XTTS-versie ze niet accepteert,
-          # valt het script terug op normale XTTS.
-          # ------------------------------------------------------------
-
+          # Expressiviteit
           XTTS_TEMPERATURE: '0.75'
           XTTS_TOP_P: '0.85'
           XTTS_TOP_K: '50'
@@ -120,7 +82,6 @@ jobs:
           TRANSFORMERS_CACHE: '/home/runner/.cache/huggingface'
 
         run: |
-
           set -e
 
           python3 - <<'PYTHON'
@@ -140,10 +101,6 @@ jobs:
               ID3NoHeaderError
           )
 
-
-          # ============================================================
-          # HULPFUNCTIE
-          # ============================================================
 
           def fail(message):
               print("")
@@ -211,27 +168,18 @@ jobs:
 
 
           # ============================================================
-          # OUDE TIJDELIJKE BESTANDEN VERWIJDEREN
-          #
-          # De definitieve MP3 wordt dus iedere run opnieuw gemaakt.
+          # TIJDELIJKE BESTANDEN OPRUIMEN
           # ============================================================
 
-          temporary_files = [
+          for filename in [
               "raw.wav",
               "voice_pitched.wav",
               "clean_speaker.wav"
-          ]
-
-          for filename in temporary_files:
+          ]:
 
               if os.path.exists(filename):
-
                   os.remove(filename)
-
-                  print(
-                      "Verwijderd:",
-                      filename
-                  )
+                  print("Verwijderd:", filename)
 
 
           # ============================================================
@@ -240,7 +188,6 @@ jobs:
 
           print("")
           print("TXT downloaden...")
-
 
           try:
 
@@ -383,7 +330,7 @@ jobs:
 
 
           # ============================================================
-          # XTTS
+          # XTTS MODEL
           # ============================================================
 
           from TTS.api import TTS
@@ -584,7 +531,6 @@ jobs:
                   "Pitch aanpassen..."
               )
 
-
               try:
 
                   probe = subprocess.run(
@@ -641,7 +587,6 @@ jobs:
               )
 
 
-              # Veilig bereik voor atempo
               if (
                   tempo_correction < 0.5
                   or tempo_correction > 2.0
@@ -696,10 +641,8 @@ jobs:
               print(
                   "Pitch succesvol aangepast."
               )
-
-
-          # ============================================================
-          # VOICE LADEN
+                       # ============================================================
+          # VOICE LADEN EN NORMALISEREN
           # ============================================================
 
           try:
@@ -735,7 +678,6 @@ jobs:
               print(
                   "Newsbed gevonden."
               )
-
 
               try:
 
@@ -792,7 +734,7 @@ jobs:
           # ============================================================
           # MP3 EXPORT
           #
-          # Dit bestand wordt iedere run opnieuw gemaakt.
+          # Dit overschrijft een bestaande weer-update.mp3.
           # ============================================================
 
           print("")
@@ -842,4 +784,199 @@ jobs:
 
 
           print(
-              "weer-update.mp3 aangemaakt: "
+              "weer-update.mp3 aangemaakt:",
+              mp3_size,
+              "bytes"
+          )
+
+
+          # ============================================================
+          # ID3 TAGS
+          # ============================================================
+
+          try:
+
+              try:
+
+                  id3 = ID3(
+                      "weer-update.mp3"
+                  )
+
+              except ID3NoHeaderError:
+
+                  id3 = ID3()
+
+
+              id3.add(
+                  TIT2(
+                      encoding=3,
+                      text="Weer Update"
+                  )
+              )
+
+
+              id3.add(
+                  TALB(
+                      encoding=3,
+                      text="Weer Update"
+                  )
+              )
+
+
+              # --------------------------------------------------------
+              # COVER
+              # --------------------------------------------------------
+
+              if os.path.exists(
+                  cover_image
+              ):
+
+                  with open(
+                      cover_image,
+                      "rb"
+                  ) as image_file:
+
+                      id3.add(
+                          APIC(
+                              encoding=3,
+                              mime="image/jpeg",
+                              type=3,
+                              desc="Cover",
+                              data=image_file.read()
+                          )
+                      )
+
+
+                  print(
+                      "Cover toegevoegd."
+                  )
+
+              else:
+
+                  print(
+                      "Geen cover gevonden:",
+                      cover_image
+                  )
+
+
+              id3.save(
+                  "weer-update.mp3"
+              )
+
+
+              print(
+                  "ID3 tags opgeslagen."
+              )
+
+
+          except Exception as error:
+
+              print(
+                  "Waarschuwing ID3:",
+                  error
+              )
+
+
+          # ============================================================
+          # DEFINITIEVE CONTROLE
+          # ============================================================
+
+          if not os.path.exists(
+              "weer-update.mp3"
+          ):
+
+              fail(
+                  "Definitieve controle mislukt."
+              )
+
+
+          print("")
+          print("==============================================")
+          print("PIPELINE SUCCESVOL")
+          print("==============================================")
+          print("weer-update.txt : OK")
+          print("weer-update.mp3 : OK")
+          print("Speed           :", speed)
+          print("Pitch           :", pitch_factor)
+          print("Temperature     :", temperature)
+          print("Top-P           :", top_p)
+          print("Top-K           :", top_k)
+          print("==============================================")
+
+
+          PYTHON
+
+
+      # ================================================================
+      # OUTPUT CONTROLEREN
+      # ================================================================
+
+      - name: Controleer output
+        run: |
+          set -e
+
+          echo "Outputbestanden:"
+
+          ls -lh \
+            weer-update.txt \
+            weer-update.mp3
+
+          echo ""
+          echo "MP3 controleren met ffprobe:"
+
+          ffprobe \
+            -v error \
+            -show_entries format=filename,duration,size \
+            -of default=noprint_wrappers=1 \
+            weer-update.mp3
+
+
+      # ================================================================
+      # COMMIT EN PUSH
+      # ================================================================
+
+      - name: Commit and push changes
+        run: |
+          set -e
+
+          git config \
+            --local \
+            user.email \
+            "action@github.com"
+
+          git config \
+            --local \
+            user.name \
+            "GitHub Action"
+
+          echo "Git status vóór add:"
+          git status --short
+
+          git add \
+            weer-update.mp3 \
+            weer-update.txt
+
+          echo ""
+          echo "Git status na add:"
+          git status --short
+
+          if git diff --cached --quiet; then
+
+            echo "Geen wijzigingen om te committen."
+
+            exit 0
+
+          fi
+
+          git commit \
+            -m "FAST Update: Weer Update - UTC+2 $(date '+%H:%M')"
+
+          git fetch origin main
+
+          git rebase origin/main
+
+          git push origin HEAD:main
+
+          echo ""
+          echo "PUSH SUCCESVOL."
+          
