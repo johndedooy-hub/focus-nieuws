@@ -1,4 +1,4 @@
-name: Create Omroep Brabant Forecast Fantastique MP3 1B3
+name: Create Omroep Brabant Forecast Fantastique MP3 1B.3
 
 on:
   workflow_dispatch:
@@ -76,7 +76,7 @@ jobs:
 
 
       # ================================================================
-      # FORECAST FANTASTIQUE PIPELINE
+      # RUN FORECAST FANTASTIQUE PIPELINE
       # ================================================================
 
       - name: Run Forecast Fantastique pipeline
@@ -90,7 +90,7 @@ jobs:
 
 
           # ------------------------------------------------------------
-          # BESTANDEN
+          # COVER
           # ------------------------------------------------------------
 
           COVER_IMAGE: 'weer-update.jpg'
@@ -98,6 +98,9 @@ jobs:
 
           # ------------------------------------------------------------
           # XTTS SNELHEID
+          #
+          # 1.00 = normaal
+          # 1.50 = snel
           # ------------------------------------------------------------
 
           XTTS_SPEED: '1.50'
@@ -106,14 +109,11 @@ jobs:
           # ------------------------------------------------------------
           # PITCH
           #
-          # 1.00 = originele toonhoogte
+          # 1.00 = origineel
           # 0.98 = heel subtiel lager
           # 0.95 = iets lager
           # 0.90 = duidelijk lager
-          # 0.85 = behoorlijk lager
-          #
-          # Voor eerste test:
-          # 0.95
+          # 1.05 = iets hoger
           # ------------------------------------------------------------
 
           PITCH_FACTOR: '0.95'
@@ -122,15 +122,14 @@ jobs:
           # ------------------------------------------------------------
           # XTTS EXPRESSIVITEIT
           #
-          # Deze waarden worden gebruikt wanneer de geïnstalleerde
-          # XTTS-versie deze parameters accepteert.
-          #
+          # Temperature lager = rustiger
           # Temperature hoger = meer variatie
-          # Temperature lager = rustiger / voorspelbaarder
           # ------------------------------------------------------------
 
           XTTS_TEMPERATURE: '0.75'
+
           XTTS_TOP_P: '0.85'
+
           XTTS_TOP_K: '50'
 
 
@@ -139,7 +138,9 @@ jobs:
           # ------------------------------------------------------------
 
           XDG_CACHE_HOME: '/home/runner/.cache'
+
           TORCH_HOME: '/home/runner/.cache/torch'
+
           TRANSFORMERS_CACHE: '/home/runner/.cache/huggingface'
 
 
@@ -171,7 +172,9 @@ jobs:
           # ============================================================
 
           def exit_with(message, code=1):
+
               print(message)
+
               sys.exit(code)
 
 
@@ -179,69 +182,47 @@ jobs:
           # INSTELLINGEN
           # ============================================================
 
-          drive_txt_url = os.environ.get(
-              "DRIVE_TXT_URL"
-          )
+          url = os.environ["DRIVE_TXT_URL"]
 
           cover_image = os.environ.get(
               "COVER_IMAGE",
               "weer-update.jpg"
           )
 
-
-          try:
-              speed = float(
-                  os.environ.get(
-                      "XTTS_SPEED",
-                      "1.50"
-                  )
+          speed = float(
+              os.environ.get(
+                  "XTTS_SPEED",
+                  "1.50"
               )
-          except Exception:
-              speed = 1.50
+          )
 
-
-          try:
-              pitch_factor = float(
-                  os.environ.get(
-                      "PITCH_FACTOR",
-                      "1.00"
-                  )
+          pitch_factor = float(
+              os.environ.get(
+                  "PITCH_FACTOR",
+                  "1.00"
               )
-          except Exception:
-              pitch_factor = 1.00
+          )
 
-
-          try:
-              temperature = float(
-                  os.environ.get(
-                      "XTTS_TEMPERATURE",
-                      "0.75"
-                  )
+          temperature = float(
+              os.environ.get(
+                  "XTTS_TEMPERATURE",
+                  "0.75"
               )
-          except Exception:
-              temperature = 0.75
+          )
 
-
-          try:
-              top_p = float(
-                  os.environ.get(
-                      "XTTS_TOP_P",
-                      "0.85"
-                  )
+          top_p = float(
+              os.environ.get(
+                  "XTTS_TOP_P",
+                  "0.85"
               )
-          except Exception:
-              top_p = 0.85
+          )
 
-
-          try:
-              top_k = int(
-                  os.environ.get(
-                      "XTTS_TOP_K",
-                      "50"
-                  )
+          top_k = int(
+              os.environ.get(
+                  "XTTS_TOP_K",
+                  "50"
               )
-          except Exception:
-              top_k = 50
+          )
 
 
           print("")
@@ -258,28 +239,49 @@ jobs:
 
 
           # ============================================================
+          # OUDE OUTPUT VERWIJDEREN
+          #
+          # Iedere run begint opnieuw.
+          # ============================================================
+
+          for filename in [
+              "weer-update.mp3",
+              "weer-update.txt",
+              "raw.wav",
+              "voice_pitched.wav",
+              "clean_speaker.wav"
+          ]:
+
+              if os.path.exists(filename):
+
+                  os.remove(filename)
+
+                  print(
+                      "Bestaand bestand verwijderd:",
+                      filename
+                  )
+
+
+          # ============================================================
           # TXT DOWNLOADEN
           # ============================================================
 
-          if not drive_txt_url:
-              exit_with(
-                  "DRIVE_TXT_URL is niet ingesteld."
-              )
-
-
-          print("Download weer-update.txt...")
+          print(
+              "Download weer-update.txt..."
+          )
 
 
           try:
 
               response = requests.get(
-                  drive_txt_url,
+                  url,
                   timeout=60
               )
 
               response.raise_for_status()
 
-              txt_data = response.text
+              txt_data = response.text.strip()
+
 
           except Exception as e:
 
@@ -288,19 +290,19 @@ jobs:
               )
 
 
-          txt_data = txt_data.strip()
-
-
           if not txt_data:
 
               print(
-                  "TXT bestand is leeg — workflow stopt netjes."
+                  "TXT bestand is leeg — "
+                  "workflow stopt netjes."
               )
 
               raise SystemExit(0)
 
 
-          print("TXT succesvol ontvangen.")
+          print(
+              "TXT succesvol ontvangen."
+          )
 
 
           # ============================================================
@@ -308,9 +310,14 @@ jobs:
           # ============================================================
 
           transcript = (
-              "Hallo, dit is de Focus Fantastiek Weer Update.\n"
+
+              "Hallo, dit is de Focus Fantastiek "
+              "Weer Update.\n"
+
               + txt_data
+
               + "\nEn tot zover de update."
+
           )
 
 
@@ -324,9 +331,12 @@ jobs:
                   "weer-update.txt",
                   "w",
                   encoding="utf-8"
-              ) as file:
+              ) as f:
 
-                  file.write(transcript)
+                  f.write(
+                      transcript
+                  )
+
 
           except Exception as e:
 
@@ -335,7 +345,9 @@ jobs:
               )
 
 
-          print("weer-update.txt opgeslagen.")
+          print(
+              "weer-update.txt aangemaakt."
+          )
 
 
           # ============================================================
@@ -347,10 +359,14 @@ jobs:
               from TTS.utils.manage import ModelManager
 
 
-              def _skip_tos(self, output_path):
+              def _skip_tos(
+                  self,
+                  output_path
+              ):
 
                   print(
-                      "CPML TOS automatisch geaccepteerd (CI)."
+                      "CPML TOS automatisch "
+                      "geaccepteerd (CI)."
                   )
 
                   return True
@@ -368,8 +384,61 @@ jobs:
 
 
           # ============================================================
-          # XTTS MODEL DOWNLOADEN
+          # PYTORCH SAFE GLOBALS
           # ============================================================
+
+          import torch
+
+          from TTS.tts.configs.xtts_config import (
+              XttsConfig
+          )
+
+          from TTS.tts.models.xtts import (
+              XttsAudioConfig,
+              XttsArgs
+          )
+
+          from TTS.config.shared_configs import (
+              BaseDatasetConfig
+          )
+
+
+          try:
+
+              torch.serialization.add_safe_globals([
+
+                  XttsConfig,
+
+                  XttsAudioConfig,
+
+                  XttsArgs,
+
+                  BaseDatasetConfig
+
+              ])
+
+
+              print(
+                  "Torch safe globals toegevoegd."
+              )
+
+
+          except Exception as e:
+
+              print(
+                  "Waarschuwing: safe globals konden "
+                  f"niet worden toegevoegd: {e}"
+              )
+
+
+          # ============================================================
+          # XTTS MODEL
+          # ============================================================
+
+          from TTS.utils.manage import ModelManager
+
+          from TTS.api import TTS
+
 
           model_name = (
               "tts_models/multilingual/"
@@ -384,19 +453,27 @@ jobs:
 
               manager = ModelManager()
 
+
               print(
-                  "Start XTTS model download..."
+                  "XTTS model downloaden/controleren..."
               )
+
 
               model_path, config_path, model_item = (
-                  manager.download_model(model_name)
+                  manager.download_model(
+                      model_name
+                  )
+              )
+
+
+              print(
+                  "XTTS model beschikbaar:"
               )
 
               print(
-                  "XTTS model gedownload naar:"
+                  model_path
               )
 
-              print(model_path)
 
           except Exception as e:
 
@@ -407,83 +484,15 @@ jobs:
 
 
           # ============================================================
-          # PYTORCH SAFE GLOBALS
-          # ============================================================
-
-          try:
-
-              import torch
-
-              from TTS.tts.configs.xtts_config import (
-                  XttsConfig
-              )
-
-              from TTS.tts.models.xtts import (
-                  XttsAudioConfig,
-                  XttsArgs
-              )
-
-              from TTS.config.shared_configs import (
-                  BaseDatasetConfig
-              )
-
-
-              torch.serialization.add_safe_globals([
-                  XttsConfig,
-                  XttsAudioConfig,
-                  XttsArgs,
-                  BaseDatasetConfig
-              ])
-
-
-              print(
-                  "Torch safe globals toegevoegd."
-              )
-
-
-          except Exception as e:
-
-              print(
-                  "Waarschuwing: safe globals konden "
-                  f"niet worden ingesteld: {e}"
-              )
-
-
-          # ============================================================
-          # TTS IMPORTEREN
-          # ============================================================
-
-          try:
-
-              from TTS.api import TTS
-
-          except Exception as e:
-
-              exit_with(
-                  f"Fout bij import TTS.api: {e}"
-              )
-
-
-          # ============================================================
           # XTTS INITIALISEREN
           # ============================================================
 
           try:
 
-              tts_source = (
+              tts = TTS(
                   model_path
                   if model_path
                   else model_name
-              )
-
-
-              print(
-                  "XTTS initialiseren..."
-              )
-
-
-              tts = TTS(
-                  tts_source
               )
 
 
@@ -501,94 +510,83 @@ jobs:
 
 
           # ============================================================
-          # SPEAKER VERWERKEN
+          # SPEAKER
           # ============================================================
 
-          speaker_src = "stem_voorbeeld.mp3"
+          speaker_src = (
+              "stem_voorbeeld.mp3"
+          )
 
 
           if not os.path.exists(
               speaker_src
           ):
 
-              print(
-                  "stem_voorbeeld.mp3 niet gevonden."
-              )
-
-              print(
-                  "Stille fallback wordt gebruikt."
+              exit_with(
+                  "stem_voorbeeld.mp3 ontbreekt."
               )
 
 
-              silent = AudioSegment.silent(
-                  duration=1000
+          try:
+
+              speaker = (
+                  AudioSegment.from_file(
+                      speaker_src
+                  )
               )
 
 
-              silent.export(
+              speaker = (
+                  effects.normalize(
+                      speaker
+                  )
+              )
+
+
+              speaker = (
+                  speaker.low_pass_filter(
+                      9000
+                  )
+              )
+
+
+              speaker = (
+                  speaker.high_pass_filter(
+                      100
+                  )
+              )
+
+
+              speaker.export(
                   "clean_speaker.wav",
                   format="wav"
               )
 
 
-          else:
-
-              try:
-
-                  print(
-                      "Stemvoorbeeld verwerken..."
-                  )
+              print(
+                  "clean_speaker.wav aangemaakt."
+              )
 
 
-                  speaker = AudioSegment.from_file(
-                      speaker_src
-                  )
+          except Exception as e:
 
-
-                  speaker = effects.normalize(
-                      speaker
-                  )
-
-
-                  speaker = speaker.low_pass_filter(
-                      9000
-                  )
-
-
-                  speaker = speaker.high_pass_filter(
-                      100
-                  )
-
-
-                  speaker.export(
-                      "clean_speaker.wav",
-                      format="wav"
-                  )
-
-
-                  print(
-                      "clean_speaker.wav aangemaakt."
-                  )
-
-
-              except Exception as e:
-
-                  exit_with(
-                      "Fout bij verwerken "
-                      f"{speaker_src}: {e}"
-                  )
+              exit_with(
+                  "Fout bij verwerken "
+                  f"{speaker_src}: {e}"
+              )
 
 
           # ============================================================
-          # TTS GENEREREN
+          # TTS
+          #
+          # Eerst proberen met de expressiviteitsinstellingen.
+          # Als de gebruikte TTS-versie deze parameters niet kent,
+          # valt het script terug op de normale XTTS-aanroep.
           # ============================================================
 
           print(
               "XTTS spraak genereren..."
           )
-
-
-          tts_parameters_supported = True
 
 
           try:
@@ -614,23 +612,20 @@ jobs:
               )
 
 
+              print(
+                  "XTTS expressiviteitsinstellingen gebruikt."
+              )
+
+
           except TypeError:
 
-              # --------------------------------------------------------
-              # Sommige TTS-versies accepteren deze parameters niet.
-              # Dan gebruiken we automatisch de standaard XTTS-aanroep.
-              # --------------------------------------------------------
-
-              tts_parameters_supported = False
-
-
               print(
-                  "Expressiviteitsparameters worden niet "
-                  "ondersteund door deze TTS-versie."
+                  "Deze XTTS-versie accepteert geen "
+                  "expressiviteitsparameters."
               )
 
               print(
-                  "Standaard XTTS-aanroep wordt gebruikt."
+                  "Standaard XTTS wordt gebruikt."
               )
 
 
@@ -666,45 +661,38 @@ jobs:
           ):
 
               exit_with(
-                  "raw.wav niet aangemaakt door TTS."
+                  "XTTS heeft geen raw.wav gemaakt."
               )
 
 
           print(
-              "raw.wav succesvol aangemaakt."
+              "raw.wav aangemaakt."
           )
 
 
           # ============================================================
-          # PITCH AANPASSEN
-          #
-          # 1.00 = originele pitch
-          #
-          # Bij een andere waarde wordt de pitch aangepast en daarna
-          # wordt het tempo terug gecorrigeerd.
+          # PITCH
           # ============================================================
 
           if abs(
               pitch_factor - 1.00
           ) < 0.001:
 
-              print(
-                  "Pitch: origineel (1.00)."
+              voice_file = (
+                  "raw.wav"
               )
 
-              voice_file = "raw.wav"
+
+              print(
+                  "Pitch blijft origineel."
+              )
 
 
           else:
 
               print(
-                  "Pitch aanpassen naar factor:",
+                  "Pitch aanpassen:",
                   pitch_factor
-              )
-
-
-              pitch_output = (
-                  "voice_pitched.wav"
               )
 
 
@@ -715,18 +703,25 @@ jobs:
               probe = subprocess.run(
 
                   [
+
                       "ffprobe",
+
                       "-v",
                       "error",
+
                       "-select_streams",
                       "a:0",
+
                       "-show_entries",
                       "stream=sample_rate",
+
                       "-of",
                       "default="
                       "noprint_wrappers=1:"
                       "nokey=1",
+
                       "raw.wav"
+
                   ],
 
                   capture_output=True,
@@ -746,8 +741,8 @@ jobs:
               if not sample_rate_text:
 
                   exit_with(
-                      "Kon sample rate van raw.wav "
-                      "niet bepalen."
+                      "Sample rate van raw.wav "
+                      "kon niet worden bepaald."
                   )
 
 
@@ -762,20 +757,13 @@ jobs:
 
 
               # --------------------------------------------------------
-              # Pitch wijzigen zonder blijvende tempoverandering.
-              #
-              # asetrate verandert tijdelijk zowel pitch als lengte.
-              # atempo corrigeert daarna de lengte terug.
+              # Tempo terug corrigeren
               # --------------------------------------------------------
 
               tempo_correction = (
                   1.0 / pitch_factor
               )
 
-
-              # FFmpeg atempo accepteert waarden binnen een bepaald
-              # bereik. Voor onze normale pitch-factoren is één filter
-              # voldoende.
 
               if (
                   tempo_correction < 0.5
@@ -792,8 +780,11 @@ jobs:
               subprocess.run(
 
                   [
+
                       "ffmpeg",
+
                       "-y",
+
                       "-i",
                       "raw.wav",
 
@@ -805,7 +796,8 @@ jobs:
                           f"atempo={tempo_correction}"
                       ),
 
-                      pitch_output
+                      "voice_pitched.wav"
+
                   ],
 
                   check=True
@@ -814,16 +806,17 @@ jobs:
 
 
               if not os.path.exists(
-                  pitch_output
+                  "voice_pitched.wav"
               ):
 
                   exit_with(
-                      "voice_pitched.wav werd niet aangemaakt."
+                      "voice_pitched.wav "
+                      "is niet aangemaakt."
                   )
 
 
               voice_file = (
-                  pitch_output
+                  "voice_pitched.wav"
               )
 
 
@@ -833,4 +826,64 @@ jobs:
 
 
           # ============================================================
-        
+          # STEM LADEN + NORMALISEREN
+          # ============================================================
+
+          try:
+
+              voice = (
+                  AudioSegment.from_file(
+                      voice_file
+                  )
+              )
+
+
+              voice = (
+                  effects.normalize(
+                      voice
+                  )
+              )
+
+
+          except Exception as e:
+
+              exit_with(
+                  "Fout bij laden stem: "
+                  f"{e}"
+              )
+
+
+          # ============================================================
+          # NEWSBED
+          # ============================================================
+
+          final = voice
+
+          bed_file = (
+              "weer-update-bed.mp3"
+          )
+
+
+          if os.path.exists(
+              bed_file
+          ):
+
+              print(
+                  "Newsbed gevonden."
+              )
+
+
+              try:
+
+                  bed = (
+                      AudioSegment.from_file(
+                          bed_file
+                      )
+                  )
+
+
+                  # ----------------------------------------------------
+                  # Newsbed 20 dB zachter
+                  # ----------------------------------------------------
+
+                  b    
