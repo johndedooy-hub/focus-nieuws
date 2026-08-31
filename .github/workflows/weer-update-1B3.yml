@@ -1,0 +1,870 @@
+name: Create Omroep Brabant Forecast Fantastique MP3
+
+on:
+  workflow_dispatch:
+
+jobs:
+  process-audio:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+
+      # ================================================================
+      # CHECKOUT
+      # ================================================================
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+
+      # ================================================================
+      # CACHE TTS MODELS
+      # ================================================================
+
+      - name: Cache TTS models
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/tts
+            ~/.cache/faster_whisper
+            ~/.cache/torch
+            ~/.cache/huggingface
+          key: tts-whisper-cache
+
+
+      # ================================================================
+      # PYTHON
+      # ================================================================
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+
+      # ================================================================
+      # DEPENDENCIES + FFMPEG
+      # ================================================================
+
+      - name: Install dependencies & FFmpeg
+        run: |
+          set -e
+
+          python -m pip install --upgrade pip
+
+          python -m pip install \
+            --default-timeout=60 \
+            torchcodec
+
+          python -m pip install \
+            --default-timeout=60 \
+            "transformers<4.40.0" \
+            "scipy<1.13.0" \
+            pydub \
+            mutagen \
+            requests \
+            python-dateutil \
+            TTS
+
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
+
+      # ================================================================
+      # FORECAST FANTASTIQUE PIPELINE
+      # ================================================================
+
+      - name: Run Forecast Fantastique pipeline
+        env:
+
+          # ------------------------------------------------------------
+          # BRONBESTAND
+          # ------------------------------------------------------------
+
+          DRIVE_TXT_URL: 'https://focusfantastique.nl/weer-update.txt'
+
+
+          # ------------------------------------------------------------
+          # BESTANDEN
+          # ------------------------------------------------------------
+
+          COVER_IMAGE: 'weer-update.jpg'
+
+
+          # ------------------------------------------------------------
+          # XTTS SPRAAKTEMPO
+          #
+          # 1.00 = normaal
+          # 1.20 = sneller
+          # 1.50 = snel
+          # ------------------------------------------------------------
+
+          XTTS_SPEED: '1.50'
+
+
+          # ------------------------------------------------------------
+          # PITCH
+          #
+          # 1.00 = originele toonhoogte
+          # 0.95 = iets lager
+          # 0.90 = duidelijk lager
+          # 0.85 = behoorlijk lager
+          # 1.05 = iets hoger
+          # ------------------------------------------------------------
+
+          PITCH_FACTOR: '0.95'
+
+
+          # ------------------------------------------------------------
+          # XTTS EXPRESSIVITEIT
+          #
+          # Temperature:
+          # lager  = rustiger / voorspelbaarder
+          # hoger  = meer variatie / expressiviteit
+          #
+          # Voor een radiostem is 0.70 - 0.80 een goed startgebied.
+          # ------------------------------------------------------------
+
+          XTTS_TEMPERATURE: '0.75'
+
+
+          # ------------------------------------------------------------
+          # XTTS TOP-P
+          #
+          # Lager = conservatiever
+          # Hoger = meer variatie
+          # ------------------------------------------------------------
+
+          XTTS_TOP_P: '0.85'
+
+
+          # ------------------------------------------------------------
+          # XTTS TOP-K
+          #
+          # Lager = minder variatie
+          # Hoger = meer mogelijke variatie
+          # ------------------------------------------------------------
+
+          XTTS_TOP_K: '50'
+
+
+          # ------------------------------------------------------------
+          # CACHE
+          # ------------------------------------------------------------
+
+          XDG_CACHE_HOME: '/home/runner/.cache'
+          TORCH_HOME: '/home/runner/.cache/torch'
+          TRANSFORMERS_CACHE: '/home/runner/.cache/huggingface'
+
+
+        run: |
+
+          set -e
+
+          python3 - <<'EOF'
+
+
+          # ============================================================
+          # IMPORTS
+          # ============================================================
+
+          import os
+          import sys
+          import math
+          import subprocess
+          import requests
+
+          from pydub import AudioSegment, effects
+
+          from mutagen.id3 import (
+              ID3,
+              TIT2,
+              TALB,
+              APIC,
+              ID3NoHeaderError
+          )
+
+
+          # ============================================================
+          # HULPFUNCTIE
+          # ============================================================
+
+          def exit_with(message, code=1):
+
+              print(message)
+              sys.exit(code)
+
+
+          # ============================================================
+          # CONFIGURATIE
+          # ============================================================
+
+          drive_txt_url = os.environ.get(
+              "DRIVE_TXT_URL"
+          )
+
+          cover_image = os.environ.get(
+              "COVER_IMAGE",
+              "weer-update.jpg"
+          )
+
+
+          try:
+
+              speed = float(
+                  os.environ.get(
+                      "XTTS_SPEED",
+                      "1.50"
+                  )
+              )
+
+          except Exception:
+
+              speed = 1.50
+
+
+          try:
+
+              pitch_factor = float(
+                  os.environ.get(
+                      "PITCH_FACTOR",
+                      "1.00"
+                  )
+              )
+
+          except Exception:
+
+              pitch_factor = 1.00
+
+
+          try:
+
+              temperature = float(
+                  os.environ.get(
+                      "XTTS_TEMPERATURE",
+                      "0.75"
+                  )
+              )
+
+          except Exception:
+
+              temperature = 0.75
+
+
+          try:
+
+              top_p = float(
+                  os.environ.get(
+                      "XTTS_TOP_P",
+                      "0.85"
+                  )
+              )
+
+          except Exception:
+
+              top_p = 0.85
+
+
+          try:
+
+              top_k = int(
+                  os.environ.get(
+                      "XTTS_TOP_K",
+                      "50"
+                  )
+              )
+
+          except Exception:
+
+              top_k = 50
+
+
+          print("")
+          print("================================================")
+          print("FORECAST FANTASTIQUE INSTELLINGEN")
+          print("================================================")
+          print("XTTS snelheid :", speed)
+          print("Pitch factor   :", pitch_factor)
+          print("Temperature    :", temperature)
+          print("Top-P          :", top_p)
+          print("Top-K          :", top_k)
+          print("================================================")
+          print("")
+
+
+          # ============================================================
+          # TXT DOWNLOADEN
+          # ============================================================
+
+          if not drive_txt_url:
+
+              exit_with(
+                  "DRIVE_TXT_URL is niet ingesteld."
+              )
+
+
+          print(
+              "Download weer-update.txt..."
+          )
+
+
+          try:
+
+              response = requests.get(
+                  drive_txt_url,
+                  timeout=60
+              )
+
+              response.raise_for_status()
+
+              txt_data = response.text
+
+          except Exception as e:
+
+              exit_with(
+                  f"Fout bij downloaden TXT: {e}"
+              )
+
+
+          txt_data = txt_data.strip()
+
+
+          if not txt_data:
+
+              print(
+                  "TXT bestand is leeg — "
+                  "workflow stopt netjes."
+              )
+
+              raise SystemExit(0)
+
+
+          print(
+              "TXT succesvol ontvangen."
+          )
+
+
+          # ============================================================
+          # TRANSCRIPT OPBOUWEN
+          # ============================================================
+
+          transcript = (
+
+              "Hallo, dit is de Focus Fantastiek "
+              "Weer Update.\n"
+
+              + txt_data
+
+              + "\nEn tot zover de update."
+
+          )
+
+
+          # ============================================================
+          # TXT OPSLAAN
+          # ============================================================
+
+          try:
+
+              with open(
+                  "weer-update.txt",
+                  "w",
+                  encoding="utf-8"
+              ) as file:
+
+                  file.write(
+                      transcript
+                  )
+
+          except Exception as e:
+
+              exit_with(
+                  f"Fout bij opslaan weer-update.txt: {e}"
+              )
+
+
+          print(
+              "weer-update.txt opgeslagen."
+          )
+
+
+          # ============================================================
+          # CPML TOS OVERRIDE
+          # ============================================================
+
+          try:
+
+              from TTS.utils.manage import ModelManager
+
+
+              def _skip_tos(
+                  self,
+                  output_path
+              ):
+
+                  print(
+                      "CPML TOS automatisch "
+                      "geaccepteerd (CI)."
+                  )
+
+                  return True
+
+
+              ModelManager.ask_tos = _skip_tos
+
+
+          except Exception as e:
+
+              print(
+                  "Waarschuwing: CPML TOS override "
+                  f"kon niet worden ingesteld: {e}"
+              )
+
+
+          # ============================================================
+          # XTTS MODEL
+          # ============================================================
+
+          model_name = (
+              "tts_models/multilingual/"
+              "multi-dataset/xtts_v2"
+          )
+
+
+          model_path = None
+
+
+          try:
+
+              manager = ModelManager()
+
+
+              print(
+                  "Start XTTS model download..."
+              )
+
+
+              model_path, config_path, model_item = (
+                  manager.download_model(
+                      model_name
+                  )
+              )
+
+
+              print(
+                  "XTTS model gedownload naar:"
+              )
+
+              print(model_path)
+
+
+          except Exception as e:
+
+              exit_with(
+                  "Fout bij downloaden XTTS model: "
+                  f"{e}"
+              )
+
+
+          # ============================================================
+          # PYTORCH SAFE GLOBALS
+          # ============================================================
+
+          try:
+
+              import torch
+
+              from TTS.tts.configs.xtts_config import (
+                  XttsConfig
+              )
+
+              from TTS.tts.models.xtts import (
+                  XttsAudioConfig,
+                  XttsArgs
+              )
+
+              from TTS.config.shared_configs import (
+                  BaseDatasetConfig
+              )
+
+
+              torch.serialization.add_safe_globals([
+
+                  XttsConfig,
+                  XttsAudioConfig,
+                  XttsArgs,
+                  BaseDatasetConfig
+
+              ])
+
+
+              print(
+                  "Torch safe globals toegevoegd."
+              )
+
+
+          except Exception as e:
+
+              print(
+                  "Waarschuwing: safe globals "
+                  f"kon niet worden ingesteld: {e}"
+              )
+
+
+          # ============================================================
+          # XTTS INITIALISEREN
+          # ============================================================
+
+          try:
+
+              from TTS.api import TTS
+
+
+          except Exception as e:
+
+              exit_with(
+                  f"Fout bij import TTS.api: {e}"
+              )
+
+
+          try:
+
+              tts_source = (
+                  model_path
+                  if model_path
+                  else model_name
+              )
+
+
+              print(
+                  "XTTS initialiseren..."
+              )
+
+
+              tts = TTS(
+                  tts_source
+              )
+
+
+              print(
+                  "XTTS succesvol geladen."
+              )
+
+
+          except Exception as e:
+
+              exit_with(
+                  "Fout bij laden XTTS model: "
+                  f"{e}"
+              )
+
+
+          # ============================================================
+          # SPEAKER SCHOONMAKEN
+          # ============================================================
+
+          speaker_src = (
+              "stem_voorbeeld.mp3"
+          )
+
+
+          if not os.path.exists(
+              speaker_src
+          ):
+
+              print(
+                  "stem_voorbeeld.mp3 niet gevonden."
+              )
+
+              print(
+                  "Stille fallback wordt gebruikt."
+              )
+
+
+              silent = AudioSegment.silent(
+                  duration=1000
+              )
+
+
+              silent.export(
+                  "clean_speaker.wav",
+                  format="wav"
+              )
+
+
+          else:
+
+              try:
+
+                  speaker = (
+                      AudioSegment.from_file(
+                          speaker_src
+                      )
+                  )
+
+
+                  speaker = (
+                      effects.normalize(
+                          speaker
+                      )
+                  )
+
+
+                  speaker = (
+                      speaker.low_pass_filter(
+                          9000
+                      )
+                  )
+
+
+                  speaker = (
+                      speaker.high_pass_filter(
+                          100
+                      )
+                  )
+
+
+                  speaker.export(
+                      "clean_speaker.wav",
+                      format="wav"
+                  )
+
+
+                  print(
+                      "clean_speaker.wav aangemaakt."
+                  )
+
+
+              except Exception as e:
+
+                  exit_with(
+                      "Fout bij verwerken "
+                      f"{speaker_src}: {e}"
+                  )
+
+
+          # ============================================================
+          # TTS GENEREREN
+          #
+          # temperature / top_p / top_k worden meegegeven wanneer
+          # de gebruikte XTTS-versie deze parameters accepteert.
+          # ============================================================
+
+          print(
+              "XTTS spraak genereren..."
+          )
+
+
+          try:
+
+              tts_kwargs = {
+
+                  "text": transcript,
+
+                  "speaker_wav":
+                      "clean_speaker.wav",
+
+                  "language": "nl",
+
+                  "file_path": "raw.wav",
+
+                  "speed": speed,
+
+                  "temperature":
+                      temperature,
+
+                  "top_p":
+                      top_p,
+
+                  "top_k":
+                      top_k
+
+              }
+
+
+              try:
+
+                  tts.tts_to_file(
+                      **tts_kwargs
+                  )
+
+
+              except TypeError as e:
+
+                  # ----------------------------------------------------
+                  # Fallback voor TTS-versies waarbij de API alleen
+                  # de standaard tts_to_file parameters accepteert.
+                  # ----------------------------------------------------
+
+                  print(
+                      "XTTS-versie accepteert de "
+                      "expressiviteitsparameters niet."
+                  )
+
+                  print(
+                      "Fallback naar standaard XTTS."
+                  )
+
+
+                  tts.tts_to_file(
+
+                      text=transcript,
+
+                      speaker_wav=
+                          "clean_speaker.wav",
+
+                      language="nl",
+
+                      file_path="raw.wav",
+
+                      speed=speed
+
+                  )
+
+
+          except Exception as e:
+
+              exit_with(
+                  "Fout tijdens TTS generatie: "
+                  f"{e}"
+              )
+
+
+          # ============================================================
+          # RAW.WAV CONTROLEREN
+          # ============================================================
+
+          if not os.path.exists(
+              "raw.wav"
+          ):
+
+              exit_with(
+                  "raw.wav niet aangemaakt door TTS."
+              )
+
+
+          print(
+              "raw.wav succesvol aangemaakt."
+          )
+
+
+          # ============================================================
+          # PITCH AANPASSEN
+          #
+          # 1.00 = origineel
+          # 0.95 = lager
+          # 0.90 = duidelijk lager
+          #
+          # De sample-rate wordt tijdelijk veranderd om de pitch
+          # te wijzigen. Daarna wordt het tempo gecorrigeerd.
+          # ============================================================
+
+          if abs(
+              pitch_factor - 1.00
+          ) > 0.001:
+
+              print(
+                  "Pitch aanpassen..."
+              )
+
+
+              pitch_output = (
+                  "voice_pitched.wav"
+              )
+
+
+              # --------------------------------------------------------
+              # Originele sample rate bepalen
+              # --------------------------------------------------------
+
+              probe = subprocess.run(
+
+                  [
+
+                      "ffprobe",
+
+                      "-v",
+                      "error",
+
+                      "-select_streams",
+                      "a:0",
+
+                      "-show_entries",
+                      "stream=sample_rate",
+
+                      "-of",
+                      "default="
+                      "noprint_wrappers=1:"
+                      "nokey=1",
+
+                      "raw.wav"
+
+                  ],
+
+                  capture_output=True,
+
+                  text=True,
+
+                  check=True
+
+              )
+
+
+              sample_rate = int(
+                  probe.stdout.strip()
+              )
+
+
+              new_rate = int(
+                  sample_rate * pitch_factor
+              )
+
+
+              # --------------------------------------------------------
+              # Tempo-correctie
+              #
+              # Bij pitch lager dan 1.00 wordt de audio door asetrate
+              # langer. atempo corrigeert dat weer.
+              # --------------------------------------------------------
+
+              tempo_correction = (
+                  pitch_factor
+              )
+
+
+              subprocess.run(
+
+                  [
+
+                      "ffmpeg",
+
+                      "-y",
+
+                      "-i",
+                      "raw.wav",
+
+                      "-filter:a",
+
+                      (
+                          f"asetrate={new_rate},"
+                          f"aresample={sample_rate},"
+                          f"atempo={tempo_correction}"
+                      ),
+
+                      pitch_output
+
+                  ],
+
+                  check=True
+
+              )
+
+
+              voice_file = (
+                  pitch_output
+ 
