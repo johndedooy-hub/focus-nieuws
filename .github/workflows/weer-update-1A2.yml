@@ -1,4 +1,4 @@
-name: Run Omroep Brabant Forecast Fantastique 1Av2
+name: Run Weerplaza Forecast Fantastique 1Av2
 
 on:
   workflow_dispatch:
@@ -14,10 +14,10 @@ jobs:
           import requests
           import json
 
-          SOURCE_URL = "https://www.omroepbrabant.nl/weer"
+          SOURCE_URL = "https://www.weerplaza.nl"
           OUTPUT_URL = "https://focusfantastique.nl/weer-update.php"
 
-          # Omroep Brabant ophalen
+          # Weerplaza ophalen
           response = requests.get(
               SOURCE_URL,
               headers={
@@ -30,20 +30,20 @@ jobs:
           html = response.text
 
           # Begin en einde van de forecast
-          start_marker = '"forecast":"'
-          end_marker = '","mapURL'
+          start_marker = '"padding-bottom-none":"'
+          end_marker = '","</p>'
 
           start = html.find(start_marker)
 
           if start == -1:
-              raise Exception("Start-marker 'forecast' niet gevonden")
+              raise Exception("Start-marker 'padding-bottom-none' niet gevonden")
 
           start += len(start_marker)
 
           end = html.find(end_marker, start)
 
           if end == -1:
-              raise Exception("Eind-marker 'mapURL' niet gevonden")
+              raise Exception("Eind-marker '</p>' niet gevonden")
 
           # Alleen de forecast eruit halen
           forecast = html[start:end]
