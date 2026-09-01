@@ -30,20 +30,20 @@ jobs:
           html = response.text
 
           # Begin en einde van de forecast
-          start_marker = '"lazy"'
-          end_marker = '","weerbericht'
+          start_marker = 'lazy'
+          end_marker = 'weerbericht'
 
           start = html.find(start_marker)
 
           if start == -1:
-              raise Exception("Start-marker 'padding-bottom-none' niet gevonden")
+              raise Exception("Start-marker 'lazy' niet gevonden")
 
           start += len(start_marker)
 
           end = html.find(end_marker, start)
 
           if end == -1:
-              raise Exception("Eind-marker '</p>' niet gevonden")
+              raise Exception("Eind-marker 'weerbericht' niet gevonden")
 
           # Alleen de forecast eruit halen
           forecast = html[start:end]
