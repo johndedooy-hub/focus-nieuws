@@ -1,0 +1,101 @@
+name: Run Buienradar Forecast Fantastique 1Av3
+
+on:
+  workflow_dispatch
+  
+jobs:
+  update-forecast:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Haal Buienradar forecast op en publiceer
+        shell: python
+        run: |
+          import requests
+          import re
+          import html as html_module
+
+          SOURCE_URL = "https://www.buienradar.nl/nederland/weerbericht/weerbericht"
+          OUTPUT_URL = "https://focusfantastique.nl/weer-update.php"
+
+          # Buienradar ophalen
+          response = requests.get(
+              SOURCE_URL,
+              headers={
+                  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/140.0 Safari/537.36"
+              },
+              timeout=30
+          )
+          response.raise_for_status()
+
+          page_html = response.text
+
+          # og:title ophalen
+          title_match = re.search(
+              r'<meta[^>]+property=["\']og:title["\'][^>]+content=["\'](.*?)["\']',
+              page_html,
+              re.IGNORECASE
+          )
+
+          # Als property/content in omgekeerde volgorde staat
+          if not title_match:
+              title_match = re.search(
+                  r'<meta[^>]+content=["\'](.*?)["\'][^>]+property=["\']og:title["\']',
+                  page_html,
+                  re.IGNORECASE
+              )
+
+          # og:description ophalen
+          description_match = re.search(
+              r'<meta[^>]+property=["\']og:description["\'][^>]+content=["\'](.*?)["\']',
+              page_html,
+              re.IGNORECASE
+          )
+
+          # Als property/content in omgekeerde volgorde staat
+          if not description_match:
+              description_match = re.search(
+                  r'<meta[^>]+content=["\'](.*?)["\'][^>]+property=["\']og:description["\']',
+                  page_html,
+                  re.IGNORECASE
+              )
+
+          if not title_match:
+              raise Exception("og:title niet gevonden")
+
+          if not description_match:
+              raise Exception("og:description niet gevonden")
+
+          title = html_module.unescape(title_match.group(1)).strip()
+          description = html_module.unescape(description_match.group(1)).strip()
+
+          if not title:
+              raise Exception("Titel is leeg")
+
+          if not description:
+              raise Exception("Beschrijving is leeg")
+
+          # Tekst samenstellen
+          forecast = f"{title}\n\n{description}"
+
+          print("Gevonden Buienradar forecast:")
+          print("--------------------------------")
+          print(forecast)
+          print("--------------------------------")
+
+          # Naar focusfantastique.nl schrijven
+          upload = requests.put(
+              OUTPUT_URL,
+              data=forecast.encode("utf-8"),
+              headers={
+                  "Content-Type": "text/plain; charset=utf-8"
+              },
+              timeout=30
+          )
+
+          print(f"Upload HTTP status: {upload.status_code}")
+
+          upload.raise_for_status()
+
+          print("Forecast succesvol gepubliceerd.")
+          
