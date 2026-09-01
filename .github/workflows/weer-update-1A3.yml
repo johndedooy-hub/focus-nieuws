@@ -1,7 +1,7 @@
 name: Run Buienradar Forecast Fantastique 1Av3
 
 on:
-  workflow_dispatch
+  workflow_dispatch:
   
 jobs:
   update-forecast:
