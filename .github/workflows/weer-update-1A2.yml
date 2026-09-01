@@ -30,8 +30,8 @@ jobs:
           html = response.text
 
           # Begin en einde van de forecast
-          start_marker = '"<p class="padding-bottom-none">":"'
-          end_marker = '","</p>'
+          start_marker = '"lazy"'
+          end_marker = '","weerbericht'
 
           start = html.find(start_marker)
 
