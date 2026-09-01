@@ -860,4 +860,122 @@ jobs:
 
               id3.save(
                   "weer-update.mp3"
-              
+              )
+
+
+              print(
+                  "ID3 tags opgeslagen."
+              )
+
+
+          except Exception as error:
+
+              print(
+                  "Waarschuwing ID3:",
+                  error
+              )
+
+
+          # ============================================================
+          # DEFINITIEVE CONTROLE
+          # ============================================================
+
+          if not os.path.exists(
+              "weer-update.mp3"
+          ):
+
+              fail(
+                  "Definitieve controle mislukt."
+              )
+
+
+          print("")
+          print("==============================================")
+          print("PIPELINE SUCCESVOL")
+          print("==============================================")
+          print("weer-update.txt : OK")
+          print("weer-update.mp3 : OK")
+          print("Speed           :", speed)
+          print("Pitch           :", pitch_factor)
+          print("Temperature     :", temperature)
+          print("Top-P           :", top_p)
+          print("Top-K           :", top_k)
+          print("==============================================")
+
+
+          PYTHON
+
+
+      # ================================================================
+      # OUTPUT CONTROLEREN
+      # ================================================================
+
+      - name: Controleer output
+        run: |
+          set -e
+
+          echo "Outputbestanden:"
+
+          ls -lh \
+            weer-update.txt \
+            weer-update.mp3
+
+          echo ""
+          echo "MP3 controleren met ffprobe:"
+
+          ffprobe \
+            -v error \
+            -show_entries format=filename,duration,size \
+            -of default=noprint_wrappers=1 \
+            weer-update.mp3
+
+
+      # ================================================================
+      # COMMIT EN PUSH
+      # ================================================================
+
+      - name: Commit and push changes
+        run: |
+          set -e
+
+          git config \
+            --local \
+            user.email \
+            "action@github.com"
+
+          git config \
+            --local \
+            user.name \
+            "GitHub Action"
+
+          echo "Git status vóór add:"
+          git status --short
+
+          git add \
+            weer-update.mp3 \
+            weer-update.txt
+
+          echo ""
+          echo "Git status na add:"
+          git status --short
+
+          if git diff --cached --quiet; then
+
+            echo "Geen wijzigingen om te committen."
+
+            exit 0
+
+          fi
+
+          git commit \
+            -m "FAST Update: Weer Update - UTC+2 $(date '+%H:%M')"
+
+          git fetch origin main
+
+          git rebase origin/main
+
+          git push origin HEAD:main
+
+          echo ""
+          echo "PUSH SUCCESVOL."
+          
