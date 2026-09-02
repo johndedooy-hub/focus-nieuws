@@ -1,4 +1,4 @@
-name: Focus Regioagenda TXT to FennaNeural v1
+name: Focus ff-regioagenda TXT to FennaNeural v1
 
 on:
   workflow_dispatch:
@@ -42,13 +42,13 @@ jobs:
 
       - name: Check newsbed
         run: |
-          if [ ! -f "newsbed.mp3" ]; then
-            echo "ERROR: newsbed.mp3 not found"
+          if [ ! -f "ff-regioagenda-bed.mp3" ]; then
+            echo "ERROR: ff-regioagenda-bed.mp3 not found"
             exit 1
           fi
 
           echo "Newsbed found:"
-          ls -lh newsbed.mp3
+          ls -lh ff-regioagenda-bed.mp3
 
       - name: Convert transcript to natural news speech
         run: |
@@ -60,8 +60,8 @@ jobs:
           from pydub import AudioSegment
 
           input_file = "ff-regioagenda.txt"
-          newsbed_file = "newsbed.mp3"
-          output_file = "Focus-Regio-News.mp3"
+          newsbed_file = "ff-regioagenda-bed.mp3"
+          output_file = "ff-regioagenda.mp3"
 
           voice = "nl-NL-FennaNeural"
           rate = "+2%"
@@ -146,7 +146,7 @@ jobs:
                   newsbed = newsbed - 15
                   final_audio = final_audio.overlay(newsbed)
 
-              final_audio.export(output_file, format="mp3", bitrate="96k")
+              final_audio.export(output_file, format="mp3", bitrate="128k")
 
               for filename in audio_parts:
                   if os.path.exists(filename):
@@ -163,8 +163,8 @@ jobs:
           python3 << 'EOF'
           from mutagen.id3 import ID3, TIT2, TALB, TPE1, APIC, ID3NoHeaderError
 
-          mp3 = "Focus-Regio-News.mp3"
-          cover = "FocusRegioAgenda.jpg"
+          mp3 = "ff-regioagenda.mp3"
+          cover = "ff-regioagenda.jpg"
 
           try:
               tags = ID3(mp3)
@@ -191,7 +191,7 @@ jobs:
       - name: Show output
         run: |
           echo "Generated audio:"
-          ls -lh Focus-Regio-News.mp3
+          ls -lh ff-regioagenda.mp3
 
       - name: Configure Git
         run: |
@@ -200,10 +200,10 @@ jobs:
 
       - name: Commit and push changes
         run: |
-          if git diff --quiet Focus-Regio-News.mp3; then
-            echo "No changes to Focus-Regio-News.mp3"
+          if git diff --quiet ff-regioagenda.mp3; then
+            echo "No changes to ff-regioagenda.mp3"
           else
-            git add Focus-Regio-News.mp3
-            git commit -m "Update: Focus Regio News"
+            git add ff-regioagenda.mp3
+            git commit -m "Update: ff-regioagenda"
             git push
           fi
