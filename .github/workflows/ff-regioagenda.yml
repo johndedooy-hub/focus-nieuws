@@ -206,12 +206,9 @@ jobs:
             git add ff-regioagenda.mp3
             git commit -m "Update: ff-regioagenda"
             git fetch origin main
+            git push origin HEAD:main
 
-          git rebase origin/main
-
-          git push origin HEAD:main
-
-          echo ""
-          echo "PUSH SUCCESVOL."
+            echo ""
+            echo "PUSH SUCCESVOL."
           
           fi
