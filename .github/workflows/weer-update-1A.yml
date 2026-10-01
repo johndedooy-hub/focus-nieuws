@@ -1,4 +1,4 @@
-name: Run Omroep Brabant Forecast Fantastique
+name: Run Omroep Brabant Forecast Langstraat & Fantastique
 
 on:
   workflow_dispatch:
