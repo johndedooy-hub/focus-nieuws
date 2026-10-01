@@ -1,4 +1,4 @@
-name: Run Omroep Brabant Forecast Langstraat & Fantastique
+name: Run Omroep Brabant Forecast Fantastique
 
 on:
   workflow_dispatch:
@@ -13,7 +13,6 @@ jobs:
         run: |
           import requests
           import json
-          import os
 
           SOURCE_URL = "https://www.omroepbrabant.nl/weer"
           OUTPUT_URL = "https://focusfantastique.nl/weer-update.php"
@@ -80,10 +79,9 @@ jobs:
           print("Weer-update succesvol gepubliceerd.")
 
           # --- Langstraat-Weer: maak aparte tekstversie en publiceer ---
-          # Begin en einde exact zoals gevraagd
           lang_transcript = "Dit is het Langstraat Weer.\n" + forecast + "\nTot zover het Langstraat weer."
 
-          # Sla lokaal op (optioneel, staat klaar als bestand)
+          # Sla lokaal op (staat klaar als bestand)
           try:
               with open("Langstraat-Weer.txt", "w", encoding="utf-8") as f:
                   f.write(lang_transcript)
