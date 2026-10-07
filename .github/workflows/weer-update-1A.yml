@@ -1,0 +1,80 @@
+name: Run Weerplaza Forecast Fantastique
+
+on:
+  workflow_dispatch:
+
+jobs:
+  update-forecast:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Haal forecast op en publiceer
+        shell: python
+        run: |
+          import requests
+          import re
+
+          SOURCE_URL = "https://weerplaza.nl"
+          OUTPUT_URL = "https://focusfantastique.nl/weer-update.php"
+
+          # Weerplaza pagina ophalen
+          response = requests.get(
+              SOURCE_URL,
+              headers={
+                  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+              },
+              timeout=30
+          )
+          response.raise_for_status()
+
+          html = response.text
+
+          # Zoeken naar het begin: padding-bottom-none
+          start_marker = "padding-bottom-none"
+          start_idx = html.find(start_marker)
+
+          if start_idx == -1:
+              raise Exception("Start-marker 'padding-bottom-none' niet gevonden")
+
+          # We gaan naar het einde van de openingstag waarin padding-bottom-none staat
+          tag_close_idx = html.find(">", start_idx)
+          if tag_close_idx == -1:
+              raise Exception("Einde van de tag met 'padding-bottom-none' niet gevonden")
+
+          content_start = tag_close_idx + 1
+
+          # Zoeken naar het eerstvolgende sluitende </p>
+          end_marker = "</p>"
+          end_idx = html.find(end_marker, content_start)
+
+          if end_idx == -1:
+              raise Exception("Eind-marker '</p>' niet gevonden na start-marker")
+
+          # Content tussen de start-tag en </p> extraheren
+          raw_forecast = html[content_start:end_idx]
+
+          # Eventuele binnenste HTML-tags (zoals <strong> of <span>) en witruimte opschonen
+          clean_forecast = re.sub(r'<[^>]+>', '', raw_forecast).strip()
+
+          print("Gevonden forecast:")
+          print("--------------------------------")
+          print(clean_forecast)
+          print("--------------------------------")
+
+          if not clean_forecast:
+              raise Exception("Forecast is leeg")
+
+          # Naar focusfantastique.nl schrijven
+          upload = requests.put(
+              OUTPUT_URL,
+              data=clean_forecast.encode("utf-8"),
+              headers={
+                  "Content-Type": "text/plain; charset=utf-8"
+              },
+              timeout=30
+          )
+
+          print(f"Upload HTTP status: {upload.status_code}")
+          upload.raise_for_status()
+
+          print("Forecast succesvol gepubliceerd.")
