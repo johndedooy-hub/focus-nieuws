@@ -126,7 +126,7 @@ jobs:
                       t += f" Windkracht {x['windstoten_windkracht']} in vlagen."
                   return t
               t = (f"Op dit moment is het {nu['temp']} graden en {weerzin(nu['weer']).replace('is het ', '', 1) if weerzin(nu['weer']).startswith('is het ') else 'er ' + weerzin(nu['weer']).replace(' er ', ' ', 1).replace('is ', 'is ', 1)}. "
-                   f"Verder vandaag {weerzin(vandaag['weer'])}, met temperaturen tussen {vandaag['min']} en {vandaag['max']} graden. "
+                   f"Verder in de regio vandaag {weerzin(vandaag['weer'])}, met temperaturen tussen {vandaag['min']} en {vandaag['max']} graden. "
                    f"{neerslag(vandaag)} {wind(vandaag)} "
                    f"Morgen {weerzin(morgen['weer'])}, met temperaturen tussen {morgen['min']} en {morgen['max']} graden. "
                    f"{neerslag(morgen)} {wind(morgen)} ")
@@ -143,7 +143,7 @@ jobs:
               try:
                   prompt = (
                       "Schrijf een Nederlands radioweerbericht voor de regio Roosendaal op basis van deze "
-                      "gegevens. Spreektaal, vlot en duidelijk, dynamisch, doorlopende zinnen, geen opsomming, geen kopjes of "
+                      "gegevens. Spreektaal, vlot, accuraat, duidelijk, dynamisch, doorlopende zinnen, geen opsomming, geen kopjes of "
                       "dubbele punten, geen markdown, geen emoji's. Opbouw: eerst vandaag en morgen in "
                       "ongeveer 130 tot 150 woorden, daarna de komende dagen kort in ongeveer 70 tot 80 "
                       "woorden. Schrijf temperaturen als '12 graden'. Schrijf de wind als: 'de wind komt met "
