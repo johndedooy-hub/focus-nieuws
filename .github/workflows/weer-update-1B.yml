@@ -43,9 +43,9 @@ jobs:
           CODES = {
               0: "helder", 1: "overwegend zonnig", 2: "half bewolkt", 3: "bewolkt",
               45: "mistig", 48: "mistig met rijp",
-              51: "zeer lichte regen", 53: "af en toe regen", 55: "lichte regen",
+              51: "af en toe lichte regen", 53: "af en toe regen", 55: "soms lichte regen",
               56: "lichte ijzel", 57: "ijzel",
-              61: "lichte regen", 63: "regen", 65: "zware regen",
+              61: "af en toe lichte regen", 63: "af en toe regen", 65: "bij momenten zware regen",
               66: "lichte ijzelregen", 67: "ijzelregen",
               71: "lichte sneeuw", 73: "sneeuw", 75: "zware sneeuw", 77: "korrelsneeuw",
               80: "lichte buien", 81: "buien", 82: "zware buien",
