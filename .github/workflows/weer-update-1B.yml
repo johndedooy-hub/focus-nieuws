@@ -143,7 +143,7 @@ jobs:
               try:
                   prompt = (
                       "Schrijf een Nederlands radioweerbericht voor de regio Roosendaal op basis van deze "
-                      "gegevens. Spreektaal, vlot, accuraat, duidelijk, dynamisch, doorlopende zinnen, geen opsomming, geen kopjes of "
+                      "gegevens. Spreektaal, vlot, nauwkeurig, duidelijk, dynamisch, doorlopende zinnen, geen opsomming, geen kopjes of "
                       "dubbele punten, geen markdown, geen emoji's. Opbouw: eerst vandaag en morgen in "
                       "ongeveer 130 tot 150 woorden, daarna de komende dagen kort in ongeveer 70 tot 80 "
                       "woorden. Schrijf temperaturen als '12 graden'. Schrijf de wind als: 'de wind komt met "
@@ -158,7 +158,7 @@ jobs:
                   resp = requests.post(
                       "https://api.openai.com/v1/chat/completions",
                       headers={"Authorization": f"Bearer {API_KEY}"},
-                      json={"model": MODEL, "temperature": 0.4,
+                      json={"model": MODEL, "temperature": 0.8,
                             "messages": [{"role": "user", "content": prompt}]},
                       timeout=60,
                   )
